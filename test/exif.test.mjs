@@ -47,6 +47,11 @@ test('returns empty fields instead of throwing on junk input', () => {
   const notJpeg = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer;
   assert.deepEqual(readExif(notJpeg), { lat: null, lon: null, taken: null, camera: null });
 
+  // A file that ends immediately after the Exif signature has no TIFF header
+  // at all; it must not throw, and it must not leave a caller waiting.
+  assert.doesNotThrow(() => readExif(load('truncated.jpg')));
+  assert.deepEqual(readExif(load('truncated.jpg')), { lat: null, lon: null, taken: null, camera: null });
+
   // A JPEG truncated mid-EXIF must not read past the buffer.
   const paris = load('paris.jpg');
   const truncated = paris.slice(0, 120);

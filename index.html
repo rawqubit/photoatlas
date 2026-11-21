@@ -416,7 +416,7 @@
     clockStart = range[0];
     clockEnd = range[1];
     trips = buildTrips(photos);
-    clock = range[1];
+    clock = clockStart;
 
     $('drop').style.display = 'none';
     $('stage').classList.add('on');
@@ -454,7 +454,8 @@
     return new Promise(function (resolve) {
       var reader = new FileReader();
       reader.onload = function () {
-        var data = PhotoExif.readExif(reader.result);
+        var data;
+        try { data = PhotoExif.readExif(reader.result); } catch (e) { data = { lat: null, lon: null, taken: null }; }
         var when = PhotoExif.exifTimeToEpoch(data.taken);
         resolve({ lat: data.lat, lon: data.lon, t: when, name: file.name });
       };

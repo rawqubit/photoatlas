@@ -63,82 +63,86 @@
       }
       p += 2 + size;
     }
-    if (tiff < 0) return out;
+    if (tiff < 0 || tiff + 8 > view.byteLength) return out;
 
-    var order = String.fromCharCode(view.getUint8(tiff), view.getUint8(tiff + 1));
-    if (order !== 'II' && order !== 'MM') return out;
-    var reader = new Reader(view, order === 'II');
-    if (reader.u16(tiff + 2) !== 0x002a) return out;
+    try {
+      var order = String.fromCharCode(view.getUint8(tiff), view.getUint8(tiff + 1));
+      if (order !== 'II' && order !== 'MM') return out;
+      var reader = new Reader(view, order === 'II');
+      if (reader.u16(tiff + 2) !== 0x002a) return out;
 
-    var ifd0 = tiff + reader.u32(tiff + 4);
-    var exifIfd = 0;
-    var gpsIfd = 0;
-    var fallbackTime = null;
+      var ifd0 = tiff + reader.u32(tiff + 4);
+      var exifIfd = 0;
+      var gpsIfd = 0;
+      var fallbackTime = null;
 
-    function eachEntry(dirOffset, fn) {
-      if (dirOffset <= tiff || dirOffset + 2 > view.byteLength) return;
-      var count = reader.u16(dirOffset);
-      if (count > 512) return;
-      for (var i = 0; i < count; i++) {
-        var entry = dirOffset + 2 + i * 12;
-        if (entry + 12 > view.byteLength) return;
-        fn(reader.u16(entry), reader.u16(entry + 2), reader.u32(entry + 4), entry + 8);
-      }
-    }
-
-    function ascii(entryOffset, count) {
-      var at = count > 4 ? tiff + reader.u32(entryOffset) : entryOffset;
-      var s = '';
-      for (var i = 0; i < count && at + i < view.byteLength; i++) {
-        var c = view.getUint8(at + i);
-        if (c === 0) break;
-        s += String.fromCharCode(c);
-      }
-      return s;
-    }
-
-    eachEntry(ifd0, function (tag, type, count, valueAt) {
-      if (tag === 0x8769) exifIfd = tiff + reader.u32(valueAt);
-      else if (tag === 0x8825) gpsIfd = tiff + reader.u32(valueAt);
-      else if (tag === 0x0132 && type === 2) fallbackTime = ascii(valueAt, count);
-      else if (tag === 0x010f && type === 2) out.camera = ascii(valueAt, count);
-    });
-
-    if (exifIfd) {
-      eachEntry(exifIfd, function (tag, type, count, valueAt) {
-        if (tag === 0x9003 && type === 2) out.taken = ascii(valueAt, count);
-        else if (tag === 0x9004 && type === 2 && !out.taken) out.taken = ascii(valueAt, count);
-        else if (tag === 0xa002 || tag === 0xa003) {
-          /* pixel dimensions, unused today, kept for future overlays */
+      function eachEntry(dirOffset, fn) {
+        if (dirOffset <= tiff || dirOffset + 2 > view.byteLength) return;
+        var count = reader.u16(dirOffset);
+        if (count > 512) return;
+        for (var i = 0; i < count; i++) {
+          var entry = dirOffset + 2 + i * 12;
+          if (entry + 12 > view.byteLength) return;
+          fn(reader.u16(entry), reader.u16(entry + 2), reader.u32(entry + 4), entry + 8);
         }
-      });
-    }
-    if (!out.taken && fallbackTime) out.taken = fallbackTime;
+      }
 
-    if (gpsIfd) {
-      var latRef = 'N', lonRef = 'E';
-      var latParts = null, lonParts = null;
-      eachEntry(gpsIfd, function (tag, type, count, valueAt) {
-        if (tag === 0x0001) latRef = ascii(valueAt, count) || 'N';
-        else if (tag === 0x0003) lonRef = ascii(valueAt, count) || 'E';
-        else if (tag === 0x0002 || tag === 0x0004) {
-          if (type !== 5 || count < 3) return;
-          var at = tiff + reader.u32(valueAt);
-          if (at + 24 > view.byteLength) return;
-          var parts = [readRational(reader, at), readRational(reader, at + 8), readRational(reader, at + 16)];
-          if (!parts.every(Number.isFinite)) return;
-          if (tag === 0x0002) latParts = parts;
-          else lonParts = parts;
+      function ascii(entryOffset, count) {
+        var at = count > 4 ? tiff + reader.u32(entryOffset) : entryOffset;
+        var s = '';
+        for (var i = 0; i < count && at + i < view.byteLength; i++) {
+          var c = view.getUint8(at + i);
+          if (c === 0) break;
+          s += String.fromCharCode(c);
         }
+        return s;
+      }
+
+      eachEntry(ifd0, function (tag, type, count, valueAt) {
+        if (tag === 0x8769) exifIfd = tiff + reader.u32(valueAt);
+        else if (tag === 0x8825) gpsIfd = tiff + reader.u32(valueAt);
+        else if (tag === 0x0132 && type === 2) fallbackTime = ascii(valueAt, count);
+        else if (tag === 0x010f && type === 2) out.camera = ascii(valueAt, count);
       });
-      if (latParts) {
-        var lat = latParts[0] + latParts[1] / 60 + latParts[2] / 3600;
-        out.lat = latRef.toUpperCase() === 'S' ? -lat : lat;
+
+      if (exifIfd) {
+        eachEntry(exifIfd, function (tag, type, count, valueAt) {
+          if (tag === 0x9003 && type === 2) out.taken = ascii(valueAt, count);
+          else if (tag === 0x9004 && type === 2 && !out.taken) out.taken = ascii(valueAt, count);
+          else if (tag === 0xa002 || tag === 0xa003) {
+            /* pixel dimensions, unused today, kept for future overlays */
+          }
+        });
       }
-      if (lonParts) {
-        var lon = lonParts[0] + lonParts[1] / 60 + lonParts[2] / 3600;
-        out.lon = lonRef.toUpperCase() === 'W' ? -lon : lon;
+      if (!out.taken && fallbackTime) out.taken = fallbackTime;
+
+      if (gpsIfd) {
+        var latRef = 'N', lonRef = 'E';
+        var latParts = null, lonParts = null;
+        eachEntry(gpsIfd, function (tag, type, count, valueAt) {
+          if (tag === 0x0001) latRef = ascii(valueAt, count) || 'N';
+          else if (tag === 0x0003) lonRef = ascii(valueAt, count) || 'E';
+          else if (tag === 0x0002 || tag === 0x0004) {
+            if (type !== 5 || count < 3) return;
+            var at = tiff + reader.u32(valueAt);
+            if (at + 24 > view.byteLength) return;
+            var parts = [readRational(reader, at), readRational(reader, at + 8), readRational(reader, at + 16)];
+            if (!parts.every(Number.isFinite)) return;
+            if (tag === 0x0002) latParts = parts;
+            else lonParts = parts;
+          }
+        });
+        if (latParts) {
+          var lat = latParts[0] + latParts[1] / 60 + latParts[2] / 3600;
+          out.lat = latRef.toUpperCase() === 'S' ? -lat : lat;
+        }
+        if (lonParts) {
+          var lon = lonParts[0] + lonParts[1] / 60 + lonParts[2] / 3600;
+          out.lon = lonRef.toUpperCase() === 'W' ? -lon : lon;
+        }
       }
+    } catch (e) {
+      return out;
     }
 
     if (out.lat !== null && (out.lat < -90 || out.lat > 90)) out.lat = null;

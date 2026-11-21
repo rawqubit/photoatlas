@@ -81,3 +81,10 @@ cases = [
 for name, lat, lon, when in cases:
     open("test/fixtures/" + name, "wb").write(build(lat, lon, when))
     print("wrote", name, lat, lon, when)
+
+# A file that ends right after the Exif signature: the TIFF header is missing
+# entirely, which used to throw out of the reader and stall the whole batch.
+app1 = b"Exif\0\0"
+open("test/fixtures/truncated.jpg", "wb").write(
+    TINY[:2] + b"\xff\xe1" + struct.pack(">H", len(app1) + 2) + app1)
+print("wrote truncated.jpg")
