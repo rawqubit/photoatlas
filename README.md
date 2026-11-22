@@ -1,5 +1,7 @@
 # photoatlas
 
+[![CI](https://github.com/rawqubit/photoatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/rawqubit/photoatlas/actions/workflows/ci.yml) [![license](https://img.shields.io/badge/license-MIT-56d3a6)](https://github.com/rawqubit/photoatlas/blob/main/LICENSE) [![dependencies](https://img.shields.io/badge/dependencies-none-56d3a6)](https://github.com/rawqubit/photoatlas)
+
 **Your photos already know where you have been.** Drop a folder of them and ten
 years become one map you can watch fill in, year by year.
 
@@ -26,9 +28,10 @@ them into:
 - **A card you can post.** One button renders a 1200×630 PNG of the map with
   your years and totals on it.
 
-It also counts what it could not read: **an ROC figure of "photos with a
-location" is shown up front**, because a folder of screenshots has none and you
-should know that in the first second, not after waiting.
+It also says what it could **not** read: the count of photos that actually
+carried a location sits in the sidebar from the first second, because a folder of
+screenshots has none and you should learn that immediately, not after waiting for
+an empty map.
 
 ## The privacy claim, and how to check it
 
@@ -41,7 +44,7 @@ you use it. That is a demo, not a proof, so here is the proof:
 - Open DevTools → Network, drop a folder, sort by size. Nothing moves.
 - Turn off your network after the page loads. It keeps working.
 
-The EXIF parsing is 190 lines in [`src/exif.js`](src/exif.js) with no
+The EXIF parsing is 165 lines in [`src/exif.js`](src/exif.js) with no
 dependencies, so you can check it instead of trusting it.
 
 ## Run it
