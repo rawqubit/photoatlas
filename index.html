@@ -554,7 +554,7 @@
         var entry = item.webkitGetAsEntry();
         if (entry) jobs.push(walkEntry(entry, out));
       });
-      Promise.all(jobs).then(function () { handleFiles(out); });
+      Promise.all(jobs).then(function () { handleFiles(out.length ? out : e.dataTransfer.files); });
       return;
     }
     handleFiles(e.dataTransfer.files);
