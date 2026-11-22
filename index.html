@@ -153,6 +153,12 @@
 (function () {
   'use strict';
 
+  if (!window.PhotoExif) {
+    var drop = document.getElementById('drop');
+    if (drop) drop.innerHTML = '<h2>src/exif.js did not load</h2><p>The reader is a separate script; without it this page cannot read a single photo. Check the console.</p>';
+    return;
+  }
+
   /* ---- proof of privacy: wrap the only two ways out of a page ---- */
   var sent = 0;
   var originalFetch = window.fetch;
