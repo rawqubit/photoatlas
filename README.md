@@ -10,7 +10,7 @@ dropped into and never leave it — the whole product is a static page.
 
 ![photoatlas showing the demo data](docs/screenshot.png)
 
-**Try it: [rawqubit.github.io/photoatlas](https://rawqubit.github.io/photoatlas/)** — the demo runs on 115 sample photos, and takes one click.
+**Try it: [srinikhilchakilam.com/photoatlas](https://srinikhilchakilam.com/photoatlas/)** — the demo runs on 115 sample photos, and takes one click. A mirror also runs at [rawqubit.github.io/photoatlas](https://rawqubit.github.io/photoatlas/).
 
 ## What it does
 
