@@ -43,6 +43,7 @@
   button.primary:hover { background: #ffb257; }
   button.ghost { background: transparent; }
   .hint { margin-top: 18px; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .pickmsg { margin: 14px auto 0; max-width: 560px; font-size: 13px; line-height: 1.5; color: var(--amber); }
   .stage { display: none; margin-top: 26px; }
   .stage.on { display: block; }
   .grid { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
@@ -78,6 +79,7 @@
   footer { margin: 54px 0 40px; color: var(--faint); font-size: 12px; line-height: 1.7; border-top: 1px solid var(--line); padding-top: 18px; display: flex; gap: 24px; flex-wrap: wrap; }
   footer a { color: var(--muted); }
   .fine { font-family: var(--mono); font-size: 11px; }
+  .sidenote { margin-top: 14px; font-size: 12px; line-height: 1.5; color: var(--amber); }
   @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .side { order: 2; } }
   @media (max-width: 560px) { h1 { margin-top: 26px; } .drop { padding: 30px 16px; } .yearbig { font-size: 22px; } }
 </style>
@@ -95,14 +97,16 @@
   <p class="lede">Every phone photo carries the coordinates of the moment it was taken. Drop a folder and ten years of them become one map you can watch fill in, year by year. The files are read in this tab — there is no server to send them to.</p>
 
   <div class="drop" id="drop">
-    <h2>Drop a folder of photos</h2>
-    <p>JPEG, straight off a phone or camera. Folders work too.</p>
+    <h2>Drop photos — or a folder</h2>
+    <p>JPEG, straight off a phone or camera. Folders work too. HEIC photos need exporting as JPEG first.</p>
     <div class="row">
       <button class="primary" id="pick">Choose photos</button>
+      <button class="ghost" id="pickdir">Choose a folder</button>
       <button class="ghost" id="demo">See the demo — <span id="demoCount">115</span> photos</button>
     </div>
     <div class="hint">nothing is uploaded · nothing is stored · works offline</div>
-    <input type="file" id="file" accept="image/jpeg,.jpg,.jpeg" multiple hidden>
+    <div class="pickmsg" id="pickmsg" hidden></div>
+    <input type="file" id="file" accept="image/jpeg,image/jpg,.jpg,.jpeg,.jpe,.jfif" multiple hidden>
     <input type="file" id="dir" webkitdirectory directory multiple hidden>
   </div>
 
@@ -136,6 +140,7 @@
           <button id="save">Save a card</button>
           <button class="ghost" id="reset">Another folder</button>
         </div>
+        <div class="sidenote" id="sidenote" hidden></div>
       </aside>
     </div>
   </div>
@@ -408,7 +413,7 @@
   function loadPhotos(list, fromDemo) {
     var withGps = list.filter(function (p) { return p.lat !== null && p.lon !== null; });
     if (!withGps.length) {
-      alert('None of those photos had a location tag. Phone photos usually do; screenshots and downloads usually do not.');
+      note('None of those photos carried a location tag. Phone photos usually do; screenshots and downloads usually do not.');
       return;
     }
     photos = withGps;
@@ -470,12 +475,35 @@
     });
   }
 
+  function note(text) {
+    var el = $('stage').classList.contains('on') ? $('sidenote') : $('pickmsg');
+    el.textContent = text;
+    el.hidden = false;
+  }
+
   function handleFiles(files) {
-    var list = Array.prototype.slice.call(files).filter(function (f) {
-      return /\.(jpe?g)$/i.test(f.name) || f.type === 'image/jpeg';
+    var all = Array.prototype.slice.call(files);
+    var list = all.filter(function (f) {
+      return /\.(jpe?g|jfif)$/i.test(f.name) || f.type === 'image/jpeg';
     });
-    if (!list.length) { alert('Drop JPEGs — that is where the GPS tag lives.'); return; }
-    Promise.all(list.slice(0, 4000).map(readFile)).then(function (out) { loadPhotos(out, false); });
+    var heic = all.filter(function (f) {
+      return /\.(heic|heif)$/i.test(f.name) || f.type === 'image/heic' || f.type === 'image/heif';
+    });
+    if (!list.length) {
+      note(heic.length
+        ? 'Those are HEIC photos — iPhones save that format by default and this page cannot read its location. Set Settings › Camera › Formats to “Most Compatible”, or export them as JPEG, then choose them again.'
+        : 'Those files are not JPEGs. Choose .jpg, .jpeg, .jpe or .jfif photos — the GPS tag lives in the JPEG header.');
+      return;
+    }
+    var skipped = all.length - list.length;
+    var skipNote = skipped
+      ? skipped + ' file' + (skipped === 1 ? '' : 's') + ' skipped: this page reads JPEG only'
+        + (heic.length ? ', and HEIC needs exporting as JPEG first' : '') + '.'
+      : '';
+    Promise.all(list.slice(0, 4000).map(readFile)).then(function (out) {
+      loadPhotos(out, false);
+      if (skipNote) note(skipNote);
+    });
   }
 
   function walkEntry(entry, out) {
@@ -503,9 +531,10 @@
     return Promise.resolve();
   }
 
-  $('pick').addEventListener('click', function () { $('dir').click(); });
-  $('dir').addEventListener('change', function (e) { handleFiles(e.target.files); });
-  $('file').addEventListener('change', function (e) { handleFiles(e.target.files); });
+  $('pick').addEventListener('click', function () { $('file').click(); });
+  $('pickdir').addEventListener('click', function () { $('dir').click(); });
+  $('dir').addEventListener('change', function (e) { handleFiles(e.target.files); e.target.value = ''; });
+  $('file').addEventListener('change', function (e) { handleFiles(e.target.files); e.target.value = ''; });
   $('demo').addEventListener('click', function () { loadPhotos(demoPhotos(), true); });
   document.addEventListener('DOMContentLoaded', function () { $('demoCount').textContent = demoPhotos().length; });
 
@@ -581,6 +610,8 @@
     photos = []; trips = []; activeTrip = -1; playing = false; clock = 0;
     $('stage').classList.remove('on');
     drop.style.display = '';
+    $('pickmsg').hidden = true;
+    $('sidenote').hidden = true;
     $('play').textContent = 'Play';
   });
 
